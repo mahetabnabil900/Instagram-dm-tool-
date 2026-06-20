@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AutoReply — Instagram Automation</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/css/dashboard.css" />
+</head>
+<body>
+  <!-- Sidebar -->
+  <nav class="sidebar">
+    <div class="sidebar-brand">
+      <span class="brand-icon">⚡</span>
+      <span class="brand-name">AutoReply</span>
+    </div>
+    <ul class="sidebar-nav">
+      <li>
+        <button class="nav-btn active" data-tab="campaigns" onclick="switchTab('campaigns', this)">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
+          Campaigns
+        </button>
+      </li>
+      <li>
+        <button class="nav-btn" data-tab="settings" onclick="switchTab('settings', this)">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83"/></svg>
+          Settings
+        </button>
+      </li>
+    </ul>
+    <div class="sidebar-footer">
+      <div class="connection-status" id="connectionStatus">
+        <span class="status-dot" id="statusDot"></span>
+        <span id="statusText">Checking…</span>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Main content -->
+  <main class="main">
+
+    <!-- ===== CAMPAIGNS TAB ===== -->
+    <div id="tab-campaigns" class="tab-panel active">
+      <header class="page-header">
+        <div>
+          <h1>Campaigns</h1>
+          <p class="page-subtitle">Each campaign watches one post for trigger keywords.</p>
+        </div>
+        <button class="btn btn-primary" onclick="openModal('new')">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14M5 12h14"/></svg>
+          New campaign
+        </button>
+      </header>
+
+      <div id="campaignList" class="campaign-grid">
+        <div class="empty-state" id="emptyCampaigns">
+          <div class="empty-icon">📭</div>
+          <h3>No campaigns yet</h3>
+          <p>Create your first campaign to start automating replies and DMs.</p>
+          <button class="btn btn-primary" onclick="openModal('new')">Create campaign</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== SETTINGS TAB ===== -->
+    <div id="tab-settings" class="tab-panel">
+      <header class="page-header">
+        <div>
+          <h1>Settings</h1>
+          <p class="page-subtitle">Connect your Instagram Business account.</p>
+        </div>
+      </header>
+
+      <div class="settings-card">
+        <h2 class="settings-section-title">Instagram credentials</h2>
+        <p class="settings-hint">
+          These are saved to your local database. See the
+          <a href="https://github.com" target="_blank">README</a> for how to obtain each value.
+        </p>
+
+        <div class="form-group">
+          <label for="accessToken">Long-lived User Access Token</label>
+          <input type="password" id="accessToken" class="form-input" placeholder="EAAxxxxxx…" autocomplete="off" />
+          <span class="field-hint">Expires after 60 days — see README on refreshing.</span>
+        </div>
+
+        <div class="form-group">
+          <label for="pageId">Facebook Page ID</label>
+          <input type="text" id="pageId" class="form-input" placeholder="123456789" />
+        </div>
+
+        <div class="form-group">
+          <label for="igAccountId">Instagram Business Account ID</label>
+          <input type="text" id="igAccountId" class="form-input" placeholder="987654321" />
+        </div>
+
+        <div class="form-row">
+          <button class="btn btn-primary" onclick="saveConfig()">Save credentials</button>
+          <button class="btn btn-secondary" onclick="verifyConfig()">Test connection</button>
+        </div>
+
+        <div id="configStatus" class="config-status hidden"></div>
+      </div>
+
+      <div class="settings-card">
+        <h2 class="settings-section-title">Webhook info</h2>
+        <p class="settings-hint">Point your Facebook Developer App webhook to this URL:</p>
+        <div class="code-block">
+          <code id="webhookUrl"></code>
+          <button class="copy-btn" onclick="copyWebhookUrl()">Copy</button>
+        </div>
+        <p class="settings-hint" style="margin-top:12px">Subscribe to the <strong>comments</strong> field on your Instagram object.</p>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- ===== CAMPAIGN MODAL ===== -->
+  <div id="campaignModal" class="modal-overlay hidden" onclick="closeModalOnBackdrop(event)">
+    <div class="modal">
+      <div class="modal-header">
+        <h2 id="modalTitle">New campaign</h2>
+        <button class="modal-close" onclick="closeModal()">✕</button>
+      </div>
+
+      <div class="modal-body">
+        <input type="hidden" id="editCampaignId" />
+
+        <div class="form-group">
+          <label for="postId">Instagram Post ID</label>
+          <div class="input-with-action">
+            <input type="text" id="postId" class="form-input" placeholder="17854360229135492" />
+            <button class="btn btn-secondary btn-sm" onclick="fetchPostPreview()">Preview</button>
+          </div>
+          <span class="field-hint">Get the Post ID via Graph API Explorer — see README.</span>
+        </div>
+
+        <!-- Post preview -->
+        <div id="postPreview" class="post-preview hidden">
+          <img id="previewThumb" src="" alt="Post thumbnail" />
+          <div class="preview-meta">
+            <span class="preview-type" id="previewType"></span>
+            <p id="previewCaption"></p>
+            <a id="previewLink" href="#" target="_blank" class="preview-link">View on Instagram ↗</a>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="keywords">Trigger keywords <span class="label-note">comma-separated, case-insensitive</span></label>
+          <input type="text" id="keywords" class="form-input" placeholder="link, send me, info, drop it" />
+          <span class="field-hint">A comment matching ANY of these keywords triggers the automation.</span>
+        </div>
+
+        <div class="form-group">
+          <label for="commentReply">Public comment reply</label>
+          <textarea id="commentReply" class="form-input form-textarea" rows="3" placeholder="Hey! Check your DMs 📩"></textarea>
+        </div>
+
+        <div class="form-group">
+          <label for="dmMessage">Private DM message</label>
+          <textarea id="dmMessage" class="form-input form-textarea" rows="4" placeholder="Hi! Thanks for your interest. Here's the link you asked for: …"></textarea>
+          <span class="field-hint">Note: users must have messaged your business first, or you need the instagram_manage_messages permission approved. See README.</span>
+        </div>
+
+        <div class="form-group toggle-group">
+          <label class="toggle-label">
+            <input type="checkbox" id="isActive" checked />
+            <span class="toggle-track"><span class="toggle-thumb"></span></span>
+            Campaign active
+          </label>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button class="btn btn-ghost" onclick="closeModal()">Cancel</button>
+        <button class="btn btn-primary" onclick="saveCampaign()">Save campaign</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== DELETE CONFIRM MODAL ===== -->
+  <div id="deleteModal" class="modal-overlay hidden" onclick="closeDeleteModalOnBackdrop(event)">
+    <div class="modal modal-sm">
+      <div class="modal-header">
+        <h2>Delete campaign?</h2>
+        <button class="modal-close" onclick="closeDeleteModal()">✕</button>
+      </div>
+      <div class="modal-body">
+        <p>This will permanently remove the campaign and stop all automations for this post. This can't be undone.</p>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-ghost" onclick="closeDeleteModal()">Cancel</button>
+        <button class="btn btn-danger" onclick="confirmDelete()">Delete</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast -->
+  <div id="toast" class="toast hidden"></div>
+
+  <script src="/static/js/dashboard.js"></script>
+</body>
+</html>
